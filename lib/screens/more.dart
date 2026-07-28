@@ -234,7 +234,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                       icon: '🏢',
                       title: '${x['name']}',
                       sub: '${x['code']} · ${x['mode'] == 'auto' ? 'Auto mode' : 'Manual mode'}\n'
-                          'Low alert below ${money(x['low_limit'] as num)}',
+                          'Low alert below ${moneynumOf(x['low_limit'])}',
                       amount: x['mode'] == 'auto' ? 'AUTO' : 'MANUAL',
                       amountColor: x['mode'] == 'auto' ? C.accent : C.pink,
                       onMenu: () async {
@@ -494,7 +494,7 @@ class _BanksScreenState extends State<BanksScreen> {
                 const Empty('🏦', 'Koi bank nahi')
               else
                 ...s.data!.map((b) {
-                  final r = (b['chg_rate'] as num).toDouble();
+                  final r = numOf(b['chg_rate']);
                   return Tile(
                     icon: '🏦',
                     color: r > 0 ? C.error : C.accent,
@@ -644,8 +644,8 @@ class _RatesScreenState extends State<RatesScreen> {
               ...s.data!.map((x) {
                 final out = x['direction'] == 'cashout';
                 final col = C.hex('${x['color']}');
-                final cp = (x['charge_pct'] as num).toDouble();
-                final rt = (x['round_to'] as num).toDouble();
+                final cp = numOf(x['charge_pct']);
+                final rt = numOf(x['round_to']);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
@@ -677,7 +677,7 @@ class _RatesScreenState extends State<RatesScreen> {
                         Row2('₹10000 →', '₹${customerCharge(10000, cp, rt).toStringAsFixed(0)}',
                             small: true),
                       ],
-                    ] else if ((x['comm_pct'] as num) > 0)
+                    ] else if (numOf(x['comm_pct']) > 0)
                       Row2('Commission', '${x['comm_pct']}%', bold: true)
                     else ...[
                       Row2('Charge', '$cp% round ₹$rt', bold: true),

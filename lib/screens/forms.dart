@@ -47,8 +47,8 @@ class _CmsFormState extends State<CmsForm> {
     setState(() {
       _calc = cmsCalc(
         mode: '${p['mode']}',
-        rate: (p['rate'] as num).toDouble(),
-        tdsPct: (p['tds_pct'] as num).toDouble(),
+        rate: numOf(p['rate']),
+        tdsPct: numOf(p['tds_pct']),
         amount: parseD(_amt),
       );
     });
@@ -179,11 +179,11 @@ class _ShopFormState extends State<ShopForm> {
     setState(() {
       _calc = shopCalc(
         direction: '${s['direction']}',
-        payoutPerTxn: (s['payout'] as num).toDouble(),
-        tdsPct: (s['tds_pct'] as num).toDouble(),
-        chargePct: (s['charge_pct'] as num).toDouble(),
-        roundTo: (s['round_to'] as num).toDouble(),
-        commPct: (s['comm_pct'] as num).toDouble(),
+        payoutPerTxn: numOf(s['payout']),
+        tdsPct: numOf(s['tds_pct']),
+        chargePct: numOf(s['charge_pct']),
+        roundTo: numOf(s['round_to']),
+        commPct: numOf(s['comm_pct']),
         amount: parseD(_amt),
         count: parseI(_cnt),
       );
@@ -239,9 +239,8 @@ class _ShopFormState extends State<ShopForm> {
                 Row2('Customer charge ${s?['charge_pct']}%', money(c.charge),
                     color: C.accent),
                 Row2('TDS ${s?['tds_pct']}%', '−${money(c.tds)}', color: C.error),
-              ] else if ((s?['comm_pct'] as num?) != null &&
-                  (s!['comm_pct'] as num) > 0)
-                Row2('Commission ${s['comm_pct']}%', money(c.payout))
+              ] else if (numOf(s?['comm_pct']) > 0)
+                Row2('Commission ${s?['comm_pct']}%', money(c.payout))
               else
                 Row2('Charge ${s?['charge_pct']}% (round ₹${s?['round_to']})',
                     money(c.charge),
@@ -332,13 +331,13 @@ class _DepositFormState extends State<DepositForm> {
     final b = _b;
     if (b == null) return 0;
     return depositCharge(
-        '${b['chg_mode']}', (b['chg_rate'] as num).toDouble(), parseD(_amt));
+        '${b['chg_mode']}', numOf(b['chg_rate']), parseD(_amt));
   }
 
   String get _rule {
     final b = _b;
     if (b == null) return '';
-    final r = (b['chg_rate'] as num).toDouble();
+    final r = numOf(b['chg_rate']);
     if (r <= 0) return 'No charge';
     return b['chg_mode'] == 'percent' ? '$r% of amount' : '₹$r per transaction';
   }
@@ -376,7 +375,7 @@ class _DepositFormState extends State<DepositForm> {
               const SizedBox(height: 14),
               _dd<int>('Bank (charge lagega)', _bank,
                   _banks.map((b) {
-                    final r = (b['chg_rate'] as num).toDouble();
+                    final r = numOf(b['chg_rate']);
                     final tag = r <= 0
                         ? 'free'
                         : (b['chg_mode'] == 'percent' ? '$r%' : '₹$r');

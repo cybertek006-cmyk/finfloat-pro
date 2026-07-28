@@ -225,7 +225,7 @@ class _DashboardTabState extends State<DashboardTab> {
                         final bal = w.data ?? 0;
                         final isDist = a['type'] == 'distributor';
                         final auto = a['company_mode'] == 'auto';
-                        final low = (a['low_limit'] as num).toDouble();
+                        final low = numOf(a['low_limit']);
                         return Tile(
                           icon: isDist ? '🤖' : '🏪',
                           color: isDist ? C.purple : C.accent,

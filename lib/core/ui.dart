@@ -406,6 +406,24 @@ class F extends StatelessWidget {
       );
 }
 
+
+/// Database se aayi value ko safe double banata hai.
+/// SQLite se null ya int/double kuch bhi aa sakta hai, isliye ye wrapper.
+double numOf(Object? v) {
+  if (v == null) return 0;
+  if (v is num) return v.toDouble();
+  return double.tryParse('$v') ?? 0;
+}
+
+/// List of DB rows mein se ek column ka total.
+double sumOf(List<Map<String, Object?>> rows, String key) {
+  var t = 0.0;
+  for (final r in rows) {
+    t += numOf(r[key]);
+  }
+  return t;
+}
+
 double parseD(TextEditingController c) =>
     double.tryParse(c.text.trim().replaceAll(',', '')) ?? 0;
 int parseI(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;

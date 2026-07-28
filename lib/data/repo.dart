@@ -232,7 +232,7 @@ class Repo {
   Future<double> wallet(int accountId) async {
     final a = await _db.all('accounts', where: 'id = ?', args: [accountId]);
     if (a.isEmpty) return 0;
-    var v = (a.first['opening'] as num).toDouble();
+    var v = (a.first['opening'] as num?)?.toDouble() ?? 0;
     v += await _db.sum(
         'SELECT COALESCE(SUM(amount),0) FROM deposits WHERE account_id=?', [accountId]);
     v -= await _db.sum(
