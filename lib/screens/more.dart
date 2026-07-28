@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/ui.dart';
 import '../data/repo.dart';
+import '../logic/calc.dart';
 import '../services/backup.dart';
 import '../services/pin.dart';
 import 'tabs.dart';
