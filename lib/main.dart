@@ -6,6 +6,7 @@ import 'data/repo.dart';
 import 'screens/dashboard.dart';
 import 'screens/day_dialog.dart';
 import 'screens/more.dart';
+import 'screens/pin_reset.dart';
 import 'screens/reports.dart';
 import 'screens/tabs.dart';
 import 'services/pin.dart';
@@ -90,6 +91,19 @@ class _PinScreenState extends State<PinScreen> {
   String? _err;
   bool _setup = false, _ready = false, _busy = false;
 
+  Future<void> _reload() async {
+    final set = await PinService.isSet();
+    final len = set ? await PinService.length() : 4;
+    if (mounted) {
+      setState(() {
+        _setup = !set;
+        _len = len;
+        _pin = '';
+        _first = '';
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +142,14 @@ class _PinScreenState extends State<PinScreen> {
           });
         } else if (_first == _pin) {
           await PinService.setPin(_pin);
+          // Naya PIN bana — ab recovery setup poochte hain
+          if (mounted) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const RecoverySetupScreen(firstTime: true)),
+            );
+          }
           widget.onOk();
         } else {
           HapticFeedback.heavyImpact();
@@ -280,7 +302,28 @@ class _PinScreenState extends State<PinScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              if (!_setup)
+                TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ForgotPinScreen(
+                        onReset: () {
+                          setState(() {
+                            _pin = '';
+                            _first = '';
+                            _err = null;
+                          });
+                          _reload();
+                        },
+                      ),
+                    ),
+                  ),
+                  child: const Text('PIN bhool gaye?',
+                      style: TextStyle(color: Colors.white70, fontSize: 12.5)),
+                ),
+              const SizedBox(height: 6),
               const Text('Digitronic Services · v1.0',
                   style: TextStyle(color: Colors.white38, fontSize: 10)),
               const SizedBox(height: 20),

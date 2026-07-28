@@ -4,6 +4,7 @@ import '../data/repo.dart';
 import '../logic/calc.dart';
 import '../services/backup.dart';
 import '../services/pin.dart';
+import 'pin_reset.dart';
 import 'tabs.dart';
 
 /// More tab — masters, rates, backup, settings
@@ -167,6 +168,11 @@ class _MoreTabState extends State<MoreTab> {
 
           const Sec('Security'),
           _row('🔑', 'Change PIN', '4 ya 6 digit', () => _go(const ChangePinScreen())),
+          _row('🛟', 'PIN Recovery Setup',
+              'Security question + recovery code',
+              () => _go(const RecoverySetupScreen())),
+          _row('👁️', 'Recovery Code Dekhein', 'Apna code phir se dekhein',
+              _showCode),
           _row('🚪', 'Logout', 'App abhi lock karein', widget.onLogout),
 
           const Sec('About'),
@@ -190,6 +196,45 @@ class _MoreTabState extends State<MoreTab> {
           }),
         ]);
       },
+    );
+  }
+
+  Future<void> _showCode() async {
+    final code = await PinService.recoveryCode();
+    if (!mounted) return;
+    if (code == null) {
+      toast(context, 'Abhi recovery setup nahi kiya', bg: C.warning);
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('🔑 Recovery Code'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+                color: C.primary, borderRadius: BorderRadius.circular(10)),
+            child: Center(
+              child: SelectableText(code,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                      fontFamily: 'monospace')),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text('Kahin likh kar rakhein. PIN bhoolne par kaam aayega.',
+              style: TextStyle(fontSize: 11.5, height: 1.5)),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: const Text('Band karein')),
+        ],
+      ),
     );
   }
 

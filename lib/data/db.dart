@@ -47,7 +47,14 @@ class DB {
         await b.commit(noResult: true);
       },
       onOpen: (d) async {
-        await d.execute('PRAGMA journal_mode = WAL');
+        // NOTE: 'PRAGMA journal_mode' ek value WAPAS karta hai, isliye
+        // execute() se crash hota hai -- rawQuery() zaroori hai.
+        // Fail ho to bhi app chalni chahiye, isliye try/catch.
+        try {
+          await d.rawQuery('PRAGMA journal_mode = WAL');
+        } catch (_) {
+          // WAL na mile to default journal mode se bhi kaam chal jaayega
+        }
       },
     );
   }
