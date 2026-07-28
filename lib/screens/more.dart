@@ -234,7 +234,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                       icon: '🏢',
                       title: '${x['name']}',
                       sub: '${x['code']} · ${x['mode'] == 'auto' ? 'Auto mode' : 'Manual mode'}\n'
-                          'Low alert below ${moneynumOf(x['low_limit'])}',
+                          'Low alert below ${money(numOf(x['low_limit']))}',
                       amount: x['mode'] == 'auto' ? 'AUTO' : 'MANUAL',
                       amountColor: x['mode'] == 'auto' ? C.accent : C.pink,
                       onMenu: () async {

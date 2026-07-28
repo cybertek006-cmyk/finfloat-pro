@@ -66,8 +66,8 @@ class _ReportsTabState extends State<ReportsTab> {
           ['Date', 'Party', 'Amount', 'Payout', 'TDS', 'Net'],
           e.map((x) => [
                 dmy('${x['date']}'), '${x['party']}',
-                smnumOf(x['amount']), moneynumOf(x['payout']),
-                moneynumOf(x['tds']), moneynumOf(x['net']),
+                sm(numOf(x['amount'])), money(numOf(x['payout'])),
+                money(numOf(x['tds'])), money(numOf(x['net'])),
               ]).toList(),
           {
             'Pickups': '${e.length}',
@@ -85,9 +85,9 @@ class _ReportsTabState extends State<ReportsTab> {
           ['Date', 'Service', 'Amount', 'Qty', 'Payout', 'Charge', 'Net'],
           e.map((x) => [
                 dmy('${x['date']}'), '${x['service']}',
-                smnumOf(x['amount']), '${x['txn_count']}',
-                moneynumOf(x['payout']), moneynumOf(x['charge']),
-                moneynumOf(x['net']),
+                sm(numOf(x['amount'])), '${x['txn_count']}',
+                money(numOf(x['payout'])), money(numOf(x['charge'])),
+                money(numOf(x['net'])),
               ]).toList(),
           {
             'Entries': '${e.length}',
@@ -105,8 +105,8 @@ class _ReportsTabState extends State<ReportsTab> {
           ['Date', 'Company', 'Payout', 'Extra', 'TDS', 'Net'],
           e.map((x) => [
                 dmy('${x['date']}'), '${x['company']}',
-                moneynumOf(x['payout']), moneynumOf(x['extra']),
-                moneynumOf(x['tds']), moneynumOf(x['net']),
+                money(numOf(x['payout'])), money(numOf(x['extra'])),
+                money(numOf(x['tds'])), money(numOf(x['net'])),
               ]).toList(),
           {
             'Entries': '${e.length}',
@@ -126,7 +126,7 @@ class _ReportsTabState extends State<ReportsTab> {
                 : (x['chg_mode'] == 'percent' ? '$rate%' : '₹$rate/txn');
             return [
               dmy('${x['date']}'), '${x['bank']}',
-              smnumOf(x['amount']), rule, moneynumOf(x['charge']),
+              sm(numOf(x['amount'])), rule, money(numOf(x['charge'])),
             ];
           }).toList(),
           {
@@ -142,15 +142,15 @@ class _ReportsTabState extends State<ReportsTab> {
         final mp = await r.payouts(date: d);
         final rows = <List<String>>[];
         for (final x in cms) {
-          rows.add([dmy('${x['date']}'), 'CMS', '${x['party']}', moneynumOf(x['tds'])]);
+          rows.add([dmy('${x['date']}'), 'CMS', '${x['party']}', money(numOf(x['tds']))]);
         }
         for (final x in shop) {
           if (numOf(x['tds']) > 0) {
-            rows.add([dmy('${x['date']}'), 'Shop', '${x['service']}', moneynumOf(x['tds'])]);
+            rows.add([dmy('${x['date']}'), 'Shop', '${x['service']}', money(numOf(x['tds']))]);
           }
         }
         for (final x in mp) {
-          rows.add([dmy('${x['date']}'), 'Manual', '${x['company']}', moneynumOf(x['tds'])]);
+          rows.add([dmy('${x['date']}'), 'Manual', '${x['company']}', money(numOf(x['tds']))]);
         }
         return _Rep('TDS Report', ['Date', 'Source', 'Detail', 'TDS'], rows, {
           'CMS TDS': money(sumOf(cms, 'tds')),
@@ -199,7 +199,7 @@ class _ReportsTabState extends State<ReportsTab> {
           ['Date', 'Type', 'Cash', 'Profit'],
           s.map((x) => [
                 dmy('${x['date']}'), '${x['kind']}',
-                moneynumOf(x['cash']), moneynumOf(x['profit']),
+                money(numOf(x['cash'])), money(numOf(x['profit'])),
               ]).toList(),
           {'Snapshots': '${s.length}'},
         );
@@ -208,15 +208,15 @@ class _ReportsTabState extends State<ReportsTab> {
         final rows = <List<String>>[];
         for (final x in await r.cmsEntries(date: d)) {
           rows.add(['${x['time']}', 'CMS', '${x['party']}',
-            smnumOf(x['amount']), moneynumOf(x['net'])]);
+            sm(numOf(x['amount'])), money(numOf(x['net']))]);
         }
         for (final x in await r.shopEntries(date: d)) {
           rows.add(['${x['time']}', '${x['service']}', '${x['note'] ?? '—'}',
-            smnumOf(x['amount']), moneynumOf(x['net'])]);
+            sm(numOf(x['amount'])), money(numOf(x['net']))]);
         }
         for (final x in await r.deposits(date: d)) {
           rows.add(['${x['time']}', 'Deposit', '${x['bank']}',
-            smnumOf(x['amount']), '−${moneynumOf(x['charge'])}']);
+            sm(numOf(x['amount'])), '−${money(numOf(x['charge']))}']);
         }
         final pr = await r.dayProfit(d);
         return _Rep('Day Book', ['Time', 'Type', 'Detail', 'Amount', 'Income'], rows, {

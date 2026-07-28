@@ -117,12 +117,12 @@ class _ShopTabState extends State<ShopTab> {
                       '${(e['txn_count'] as int) > 1 ? ' ×${e['txn_count']}' : ''}',
                   sub: '${e['time']}'
                       '${e['note'] != null && '${e['note']}'.isNotEmpty ? ' · ${e['note']}' : ''}\n'
-                      'Payout ${moneynumOf(e['payout'])} + Chg ${moneynumOf(e['charge'])} − TDS ${moneynumOf(e['tds'])}',
-                  amount: moneynumOf(e['amount']),
-                  amountSub: '+${moneynumOf(e['net'])}',
+                      'Payout ${money(numOf(e['payout']))} + Chg ${money(numOf(e['charge']))} − TDS ${money(numOf(e['tds']))}',
+                  amount: money(numOf(e['amount'])),
+                  amountSub: '+${money(numOf(e['net']))}',
                   onMenu: () async {
                     final r = await rowMenu(
-                        context, '${e['service']} · ${moneynumOf(e['amount'])}');
+                        context, '${e['service']} · ${money(numOf(e['amount']))}');
                     if (r == 'edit' && mounted) {
                       _open(ShopForm(code: '${e['service_code']}', edit: e));
                     } else if (r == 'delete' && mounted) {
@@ -289,12 +289,12 @@ class _CmsTabState extends State<CmsTab> {
                   title: '${e['party']}',
                   sub: '${dmy('${e['date']}')} ${e['time']}'
                       '${e['ref'] != null && '${e['ref']}'.isNotEmpty ? ' · ${e['ref']}' : ''}\n'
-                      'Payout ${moneynumOf(e['payout'])} − TDS ${moneynumOf(e['tds'])}',
-                  amount: moneynumOf(e['amount']),
-                  amountSub: '+${moneynumOf(e['net'])}',
+                      'Payout ${money(numOf(e['payout']))} − TDS ${money(numOf(e['tds']))}',
+                  amount: money(numOf(e['amount'])),
+                  amountSub: '+${money(numOf(e['net']))}',
                   onMenu: () async {
                     final r = await rowMenu(
-                        context, '${e['party']} · ${moneynumOf(e['amount'])}');
+                        context, '${e['party']} · ${money(numOf(e['amount']))}');
                     if (r == 'edit' && mounted) {
                       _open(CmsForm(edit: e));
                     } else if (r == 'delete' && mounted) {
@@ -423,8 +423,8 @@ class _PayoutTabState extends State<PayoutTab> {
                   title: '${e['company']}',
                   sub: '${dmy('${e['date']}')}'
                       '${e['note'] != null && '${e['note']}'.isNotEmpty ? ' · ${e['note']}' : ''}\n'
-                      'Payout ${moneynumOf(e['payout'])} + Extra ${moneynumOf(e['extra'])} − TDS ${moneynumOf(e['tds'])}',
-                  amount: moneynumOf(e['net']),
+                      'Payout ${money(numOf(e['payout']))} + Extra ${money(numOf(e['extra']))} − TDS ${money(numOf(e['tds']))}',
+                  amount: money(numOf(e['net'])),
                   amountSub: 'net',
                   amountColor: C.accent,
                   onMenu: () async {
@@ -568,11 +568,11 @@ class _CashTabState extends State<CashTab> {
                 sub: '${e['account']}\n'
                     '${ch > 0 ? 'Charge ${money(ch)}' : 'No charge'}'
                     '${e['utr'] != null && '${e['utr']}'.isNotEmpty ? ' · ${e['utr']}' : ''}',
-                amount: '+${moneynumOf(e['amount'])}',
+                amount: '+${money(numOf(e['amount']))}',
                 amountColor: C.accent,
                 amountSub: ch > 0 ? '−${money(ch)}' : null,
                 onMenu: () async {
-                  final r = await rowMenu(context, '${e['mode']} · ${moneynumOf(e['amount'])}');
+                  final r = await rowMenu(context, '${e['mode']} · ${money(numOf(e['amount']))}');
                   if (r == 'edit' && mounted) {
                     _open(DepositForm(edit: e));
                   } else if (r == 'delete' && mounted) {
@@ -607,7 +607,7 @@ class _CashTabState extends State<CashTab> {
                   color: C.warning,
                   title: 'Staff ko float diya',
                   sub: '${f['time']}${f['note'] != null && '${f['note']}'.isNotEmpty ? ' · ${f['note']}' : ''}',
-                  amount: moneynumOf(f['amount']),
+                  amount: money(numOf(f['amount'])),
                   amountColor: C.warning,
                   onMenu: () async {
                     final r = await rowMenu(context, 'Cash float', canEdit: false);
