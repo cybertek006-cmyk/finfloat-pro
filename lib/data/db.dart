@@ -11,8 +11,26 @@ class DB {
   static const int version = 1;
 
   Database? _db;
+  Completer<Database>? _opening;
 
-  Future<Database> get db async => _db ??= await _open();
+  /// Database handle. Ek hi baar khulta hai chahe kitni bhi queries
+  /// ek saath aayein -- warna do baar khulne se "table already exists"
+  /// jaisi error aa jaati hai aur app hamesha loading dikhati rehti hai.
+  Future<Database> get db async {
+    if (_db != null) return _db!;
+    if (_opening != null) return _opening!.future;
+
+    final c = Completer<Database>();
+    _opening = c;
+    try {
+      _db = await _open();
+      c.complete(_db);
+    } catch (e, st) {
+      _opening = null;
+      c.completeError(e, st);
+    }
+    return c.future;
+  }
 
   Future<String> path() async => p.join(await getDatabasesPath(), fileName);
 
@@ -37,6 +55,7 @@ class DB {
   Future<void> close() async {
     await _db?.close();
     _db = null;
+    _opening = null;
   }
 
   Future<void> reopen() async {

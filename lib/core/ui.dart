@@ -157,6 +157,34 @@ Future<bool> confirm(BuildContext c, String title, String msg,
       false;
 }
 
+
+/// FutureBuilder fail ho to ye dikhao -- spinner hamesha ghumne se accha hai.
+class ErrBox extends StatelessWidget {
+  final Object error;
+  const ErrBox(this.error, {super.key});
+  @override
+  Widget build(BuildContext c) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('⚠️', style: TextStyle(fontSize: 34)),
+          const SizedBox(height: 8),
+          const Text('Data load nahi hua',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: const Color(0xFFFDF0F0),
+                border: Border.all(color: const Color(0xFFF0C0C0)),
+                borderRadius: BorderRadius.circular(8)),
+            child: SelectableText('$error',
+                style: const TextStyle(fontSize: 10.5, height: 1.45)),
+          ),
+        ]),
+      );
+}
+
 class Sec extends StatelessWidget {
   final String title;
   final Widget? trailing;

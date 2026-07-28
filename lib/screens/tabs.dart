@@ -77,7 +77,8 @@ class _ShopTabState extends State<ShopTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return ErrBox(snap.error!);
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final svcs = (snap.data!['svcs'] as List).cast<Map<String, Object?>>();
         final totals = snap.data!['totals'] as Map<String, Map<String, double>>;
         final entries = (snap.data!['entries'] as List).cast<Map<String, Object?>>();
@@ -206,7 +207,8 @@ class _CmsTabState extends State<CmsTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return ErrBox(snap.error!);
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final parties = (snap.data!['parties'] as List).cast<Map<String, Object?>>();
         final tod = (snap.data!['today'] as List).cast<Map<String, Object?>>();
         final all = (snap.data!['all'] as List).cast<Map<String, Object?>>();
@@ -343,7 +345,8 @@ class _PayoutTabState extends State<PayoutTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return ErrBox(snap.error!);
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final tod = (snap.data!['today'] as List).cast<Map<String, Object?>>();
         final all = (snap.data!['all'] as List).cast<Map<String, Object?>>();
         final comps = (snap.data!['comps'] as List).cast<Map<String, Object?>>();
@@ -485,7 +488,8 @@ class _CashTabState extends State<CashTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, snap) {
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return ErrBox(snap.error!);
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final d = snap.data!;
         final cash = d['cash'] as double;
         final floats = (d['floats'] as List).cast<Map<String, Object?>>();

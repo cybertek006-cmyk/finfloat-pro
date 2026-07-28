@@ -33,7 +33,8 @@ class _MoreTabState extends State<MoreTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, s) {
-        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        if (s.hasError) return ErrBox(s.error!);
+            if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final d = s.data!;
         final lb = d['lastBackup'] as DateTime?;
         return ListView(padding: const EdgeInsets.all(14), children: [
@@ -219,6 +220,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
         body: FutureBuilder<List<Map<String, Object?>>>(
           future: Repo.i.companies(),
           builder: (c, s) {
+            if (s.hasError) return ErrBox(s.error!);
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             final list = s.data!;
             return ListView(padding: const EdgeInsets.all(14), children: [
@@ -342,6 +344,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
         body: FutureBuilder<List<Map<String, Object?>>>(
           future: Repo.i.accounts(),
           builder: (c, s) {
+            if (s.hasError) return ErrBox(s.error!);
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             return ListView(padding: const EdgeInsets.all(14), children: [
               FilledButton(onPressed: () => _form(), child: const Text('+ Add Company ID')),
@@ -485,6 +488,7 @@ class _BanksScreenState extends State<BanksScreen> {
         body: FutureBuilder<List<Map<String, Object?>>>(
           future: Repo.i.banks(),
           builder: (c, s) {
+            if (s.hasError) return ErrBox(s.error!);
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             return ListView(padding: const EdgeInsets.all(14), children: [
               FilledButton(onPressed: () => _form(), child: const Text('+ Add Bank Account')),
@@ -638,6 +642,7 @@ class _RatesScreenState extends State<RatesScreen> {
         body: FutureBuilder<List<Map<String, Object?>>>(
           future: Repo.i.services(),
           builder: (c, s) {
+            if (s.hasError) return ErrBox(s.error!);
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             return ListView(padding: const EdgeInsets.all(14), children: [
               const Note('Ek baar rate feed karein — phir har entry auto calculate hogi. '

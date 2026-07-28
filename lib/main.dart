@@ -19,18 +19,23 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: C.primary, statusBarIconBrightness: Brightness.light));
 
+  // Database khol kar default services daalte hain.
+  // Fail ho to error YAAD rakhte hain aur screen par dikhate hain --
+  // chhupate nahi, warna app hamesha loading dikhati rahegi.
+  String? bootError;
   try {
     await DB.i.db;
     await DB.i.seedServices();
-  } catch (_) {
-    // DB fail hui to app phir bhi khulegi, screen par error dikhega
+  } catch (e, st) {
+    bootError = '$e\n\n$st';
   }
 
-  runApp(const App());
+  runApp(App(bootError: bootError));
 }
 
 class App extends StatefulWidget {
-  const App({super.key});
+  final String? bootError;
+  const App({super.key, this.bootError});
   @override
   State<App> createState() => _AppState();
 }
@@ -63,9 +68,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         title: 'FinFloat Pro',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
-        home: _authed
-            ? Home(onLogout: () => setState(() => _authed = false))
-            : PinScreen(onOk: () => setState(() => _authed = true)),
+        home: widget.bootError != null
+            ? BootErrorScreen(message: widget.bootError!)
+            : (_authed
+                ? Home(onLogout: () => setState(() => _authed = false))
+                : PinScreen(onOk: () => setState(() => _authed = true))),
       );
 }
 
@@ -286,6 +293,63 @@ class _PinScreenState extends State<PinScreen> {
 }
 
 /// ----------------------------------------------------------------- HOME
+
+/// Agar app start hote hi database fail ho jaaye to ye screen dikhti hai.
+/// Chhupane se accha hai ki asli wajah saaf dikhe.
+class BootErrorScreen extends StatelessWidget {
+  final String message;
+  const BootErrorScreen({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: C.primary,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 20),
+                const Text('⚠️', style: TextStyle(fontSize: 40)),
+                const SizedBox(height: 12),
+                const Text('Database khul nahi paaya',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Ye screenshot bhej dijiye — exact wajah neeche likhi hai.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        message,
+                        style: const TextStyle(
+                            color: Color(0xFFFFD7D2),
+                            fontSize: 11,
+                            height: 1.5,
+                            fontFamily: 'monospace'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
 class Home extends StatefulWidget {
   final VoidCallback onLogout;
   const Home({super.key, required this.onLogout});

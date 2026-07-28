@@ -46,6 +46,7 @@ class _DashboardTabState extends State<DashboardTab> {
     return FutureBuilder<Map<String, dynamic>>(
       future: _load(),
       builder: (c, snap) {
+        if (snap.hasError) return ErrBox(snap.error!);
         if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
         }

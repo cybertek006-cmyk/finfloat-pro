@@ -276,6 +276,7 @@ class _ReportsTabState extends State<ReportsTab> {
         child: FutureBuilder<_Rep>(
           future: _build(),
           builder: (c, s) {
+            if (s.hasError) return ErrBox(s.error!);
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             final rep = s.data!;
             return ListView(padding: const EdgeInsets.all(14), children: [
