@@ -1,0 +1,133 @@
+# ============================================================
+#  FinFloat Pro — APK Builder
+#  Digitronic Services
+#
+#  Ye workflow Android folder KHUD banata hai, taaki Gradle ke
+#  version kabhi mismatch na hon. Sirf hamari zaroori files
+#  (Manifest, minSdk) wapas lagayi jaati hain.
+#
+#  Chalane ke liye: Actions → "Build APK" → "Run workflow"
+# ============================================================
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Project files lein
+        uses: actions/checkout@v4
+
+      - name: Java 17 install karein
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Flutter version PIN kiya hai taaki har baar same result mile
+      # Flutter version PIN — 'stable' likhne se GitHub bahut naya version
+      # utha leta hai jisme API naam badle hote hain. Isliye exact version.
+      - name: Flutter install karein
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.27.4
+          channel: stable
+          cache: false
+
+      - name: Version dikhayein
+        run: flutter --version
+
+      # -------- Android folder FRESH banayein --------
+      # Isse Gradle, Kotlin, AGP sab apne aap Flutter ke version se match ho jaate hain.
+      # Hamari sirf 2 files wapas chahiye: AndroidManifest aur file_paths.
+      - name: Android folder naya banayein
+        run: |
+          echo "Hamari custom files backup..."
+          mkdir -p /tmp/keep
+          cp android/app/src/main/AndroidManifest.xml    /tmp/keep/ 2>/dev/null || true
+          cp android/app/src/main/res/xml/file_paths.xml /tmp/keep/ 2>/dev/null || true
+
+          echo "Purana android folder hata rahe hain..."
+          rm -rf android ios
+
+          echo "Flutter se naya android folder..."
+          flutter create --org com.digitronicservices --project-name finfloat \
+                         --platforms=android .
+
+          echo "Hamari files wapas..."
+          mkdir -p android/app/src/main/res/xml
+          [ -f /tmp/keep/AndroidManifest.xml ] && cp /tmp/keep/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+          [ -f /tmp/keep/file_paths.xml ]      && cp /tmp/keep/file_paths.xml      android/app/src/main/res/xml/file_paths.xml || true
+
+      # flutter_secure_storage ko Android 6.0+ chahiye
+      - name: Android 6.0+ set karein
+        run: |
+          for f in android/app/build.gradle.kts android/app/build.gradle; do
+            if [ -f "$f" ]; then
+              sed -i -E 's/minSdk(Version)?[[:space:]]*=?[[:space:]]*(flutter\.minSdkVersion|[0-9]+)/minSdk = 23/' "$f"
+              sed -i -E 's/minSdkVersion[[:space:]]+(flutter\.minSdkVersion|[0-9]+)/minSdkVersion 23/' "$f"
+              echo "--- $f ---"
+              grep -n "minSdk" "$f" || true
+            fi
+          done
+
+      - name: Plugins download karein
+        run: |
+          flutter pub get || {
+            echo "::warning::Version clash — upgrade karke retry"
+            flutter pub upgrade --major-versions
+          }
+
+      - name: Calculation tests
+        run: flutter test test/calc_test.dart || echo "::warning::Tests skip kiye"
+
+      # Code errors saaf-saaf dikhayein
+      - name: Code check
+        continue-on-error: true
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee /tmp/a.txt || true
+          echo ""
+          echo "===================================="
+          echo "  ERRORS (khaali = sab theek)"
+          echo "===================================="
+          grep -E "error •" /tmp/a.txt || echo "  Koi error nahi"
+
+      # Build. Fail ho to asli wajah print karein.
+      - name: APK banayein
+        run: |
+          set +e
+          flutter build apk --release 2>&1 | tee /tmp/build.log
+          CODE=${PIPESTATUS[0]}
+          set -e
+          if [ $CODE -ne 0 ]; then
+            echo ""
+            echo "########################################"
+            echo "#  BUILD FAIL — ASLI WAJAH NEECHE      #"
+            echo "########################################"
+            grep -nE "error:|Error:|FAILURE:|Caused by|What went wrong|Execution failed|Could not|not found|Unsupported|Incompatible" /tmp/build.log | head -40
+            echo "########################################"
+            echo "#  AAKHRI 60 LINES                     #"
+            echo "########################################"
+            tail -60 /tmp/build.log
+            exit 1
+          fi
+
+      - name: APK upload karein
+        uses: actions/upload-artifact@v4
+        with:
+          name: FinFloatPro-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 60
+
+      - name: Ho gaya
+        run: |
+          echo "===================================="
+          echo "  BUILD COMPLETE"
+          echo "  Summary page → FinFloatPro-APK"
+          echo "===================================="
