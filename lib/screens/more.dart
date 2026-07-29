@@ -413,7 +413,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                         edge: a['type'] == 'distributor' ? C.purple : C.accent,
                         title: '${a['label']}',
                         sub: '${a['company']} · ${a['id_no']}\n'
-                            '${a['fundable'] == 1 ? '✅ Fund deposit' : '⛔ No fund'}',
+                            '${a['fundable'] == 1 ? '✅ Fund deposit' : '⛔ Fund nahi'}',
                         amount: money(w.data ?? 0),
                         onMenu: () async {
                           final r = await rowMenu(context, '${a['label']}');
@@ -447,6 +447,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final opening = TextEditingController(text: '${e?['opening'] ?? 0}');
     var cid = e?['company_id'] as int? ?? comps.first['id'] as int;
     var type = '${e?['type'] ?? 'retailer'}';
+    // Fund hota hai ya nahi -- ye ab ID type se alag hai.
+    // Kisi company mein Distributor ID mein bhi fund hota hai (jaise A2Z),
+    // kisi mein nahi (jaise RNFi). Isliye user khud chunta hai.
+    var fundable = e == null ? true : (e['fundable'] == 1);
 
     final ok = await showDialog<bool>(
       context: context,
@@ -494,6 +498,33 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   ),
               ]),
               const SizedBox(height: 12),
+              // Fund switch -- ID type se alag
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+                decoration: BoxDecoration(
+                  color: fundable ? const Color(0xFFF0F7F4) : const Color(0xFFF7F7F7),
+                  border: Border.all(
+                      color: fundable ? const Color(0xFFBFE3D3) : C.divider),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SwitchListTile(
+                  value: fundable,
+                  onChanged: (v) => setD(() => fundable = v),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                      fundable ? '✅ Is ID mein fund hota hai' : '⛔ Is ID mein fund nahi hota',
+                      style: const TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    fundable
+                        ? 'Deposit, CMS, Shop entries mein ye ID dikhegi'
+                        : 'Sirf profit entry hogi (auto-mode retailers wali)',
+                    style: const TextStyle(fontSize: 10.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               F(opening, 'Opening Balance', type: TextInputType.number),
             ]),
           ),
@@ -515,7 +546,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       'label': label.text.trim(),
       'id_no': idno.text.trim(),
       'type': type,
-      'fundable': type == 'retailer' ? 1 : 0,
+      'fundable': fundable ? 1 : 0,
       'opening': parseD(opening),
     };
     e == null

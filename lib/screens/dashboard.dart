@@ -302,7 +302,7 @@ class _DashboardTabState extends State<DashboardTab> {
                               : (bal < low ? C.warning : C.accent),
                           title: '${a['label']}',
                           sub: '${a['company']} · ${a['id_no']}\n'
-                              '${a['fundable'] == 1 ? 'Counter / CDM deposit' : 'Auto mode — no fund'}',
+                              '${a['fundable'] == 1 ? 'Fund deposit hota hai' : 'Fund nahi — sirf profit'}',
                           amount: money(bal),
                           amountSub: auto ? 'AUTO' : 'MANUAL',
                           amountColor: bal < low && !isDist ? C.warning : C.text,
