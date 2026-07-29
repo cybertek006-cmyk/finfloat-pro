@@ -35,6 +35,82 @@ class Repo {
   Future<List<Map<String, Object?>>> retailers() =>
       _db.all('retailers', order: 'name');
 
+  // -------------------------------------------------- service management
+  /// Naya service add karna. Code unique hona chahiye.
+  /// Returns null = safal, warna error message.
+  Future<String?> addService({
+    required String code,
+    required String name,
+    required String direction, // cashout | cashin
+    required String icon,
+    required String color,
+    double payout = 0,
+    double tdsPct = 0,
+    double chargePct = 0,
+    double roundTo = 10,
+    double commPct = 0,
+  }) async {
+    final clean = code.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (clean.isEmpty) return 'Code khaali nahi ho sakta';
+
+    final existing = await _db.all('services', where: 'code = ?', args: [clean]);
+    if (existing.isNotEmpty) return 'Ye code pehle se hai: $clean';
+
+    // sabse aakhir mein rakho
+    final maxOrder = await _db.count(
+        'SELECT COALESCE(MAX(sort_order),0) FROM services');
+
+    await _db.insert('services', {
+      'code': clean,
+      'name': name.trim(),
+      'direction': direction,
+      'icon': icon,
+      'color': color,
+      'payout': payout,
+      'tds_pct': tdsPct,
+      'charge_pct': chargePct,
+      'round_to': roundTo <= 0 ? 1 : roundTo,
+      'comm_pct': commPct,
+      'sort_order': maxOrder + 1,
+    });
+    return null;
+  }
+
+  /// Service delete karne se pehle check — kitni entries hain
+  Future<int> serviceEntryCount(String code) => _db.count(
+      'SELECT COUNT(*) FROM shop_entries WHERE service_code = ?', [code]);
+
+  /// Service delete. Agar entries hain to delete nahi hoga
+  /// (warna purana hisaab toot jaayega).
+  Future<String?> deleteService(int id) async {
+    final rows = await _db.all('services', where: 'id = ?', args: [id]);
+    if (rows.isEmpty) return 'Service nahi mili';
+    final code = '${rows.first['code']}';
+
+    final n = await serviceEntryCount(code);
+    if (n > 0) {
+      return 'Is service ki $n entries hain. Delete karne se purana hisaab '
+          'toot jaayega. Pehle un entries ko delete karein.';
+    }
+    await _db.remove('services', id);
+    return null;
+  }
+
+  /// Service ka order badalna (upar/neeche)
+  Future<void> moveService(int id, int direction) async {
+    final all = await services();
+    final idx = all.indexWhere((s) => s['id'] == id);
+    if (idx < 0) return;
+    final swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= all.length) return;
+
+    final a = all[idx], b = all[swapIdx];
+    await _db.update('services', a['id'] as int,
+        {'sort_order': b['sort_order']});
+    await _db.update('services', b['id'] as int,
+        {'sort_order': a['sort_order']});
+  }
+
   Future<Map<String, Object?>?> service(String code) async {
     final r = await _db.all('services', where: 'code = ?', args: [code]);
     return r.isEmpty ? null : r.first;
@@ -272,6 +348,134 @@ class Repo {
     final r = await _db.sum(
         'SELECT COALESCE(SUM(amount),0) FROM retailer_recoveries WHERE retailer_id=?', [rid]);
     return r2(i - r);
+  }
+
+  // -------------------------------------------------- retailer module
+  /// Retailer ko diya gaya fund (issues) — company ke naam ke saath
+  Future<List<Map<String, Object?>>> retailerIssues({int? rid, String? date}) async =>
+      (await _db.db).rawQuery('''
+        SELECT i.*, r.name AS retailer, a.label AS account, c.name AS company
+        FROM retailer_issues i
+        JOIN retailers r ON r.id = i.retailer_id
+        JOIN accounts a ON a.id = i.account_id
+        JOIN companies c ON c.id = a.company_id
+        WHERE 1=1 ${rid != null ? 'AND i.retailer_id = ?' : ''}
+                  ${date != null ? 'AND i.date = ?' : ''}
+        ORDER BY i.date DESC, i.id DESC''',
+          [if (rid != null) rid, if (date != null) date]);
+
+  /// Retailer se wapas aaya paisa (recoveries)
+  Future<List<Map<String, Object?>>> retailerRecoveries(
+          {int? rid, String? date}) async =>
+      (await _db.db).rawQuery('''
+        SELECT rc.*, r.name AS retailer, a.label AS account,
+               c.name AS company, b.bank AS bank_name
+        FROM retailer_recoveries rc
+        JOIN retailers r ON r.id = rc.retailer_id
+        JOIN accounts a ON a.id = rc.account_id
+        JOIN companies c ON c.id = a.company_id
+        LEFT JOIN banks b ON b.id = rc.bank_id
+        WHERE 1=1 ${rid != null ? 'AND rc.retailer_id = ?' : ''}
+                  ${date != null ? 'AND rc.date = ?' : ''}
+        ORDER BY rc.date DESC, rc.id DESC''',
+          [if (rid != null) rid, if (date != null) date]);
+
+  Future<double> retailerIssued(int rid) => _db.sum(
+      'SELECT COALESCE(SUM(amount),0) FROM retailer_issues WHERE retailer_id=?',
+      [rid]);
+
+  Future<double> retailerRecovered(int rid) => _db.sum(
+      'SELECT COALESCE(SUM(amount),0) FROM retailer_recoveries WHERE retailer_id=?',
+      [rid]);
+
+  /// Recovery method wise breakup — kis tarike se kitna aaya
+  Future<Map<String, double>> recoveryByMethod({int? rid}) async {
+    final rows = await (await _db.db).rawQuery('''
+      SELECT method, COALESCE(SUM(amount),0) AS total
+      FROM retailer_recoveries
+      ${rid != null ? 'WHERE retailer_id = ?' : ''}
+      GROUP BY method''', [if (rid != null) rid]);
+    return {
+      for (final r in rows) '${r['method']}': (r['total'] as num).toDouble()
+    };
+  }
+
+  /// Retailer ko fund dena — wallet se paisa nikalta hai
+  Future<void> saveIssue({
+    int? id,
+    required int retailerId,
+    required int accountId,
+    required double amount,
+    String? ref,
+    String? note,
+    String? date,
+  }) async {
+    final row = {
+      'retailer_id': retailerId,
+      'account_id': accountId,
+      'amount': amount,
+      'ref': ref,
+      'note': note,
+      'date': date ?? todayStr(),
+      'time': nowTime(),
+    };
+    id == null
+        ? await _db.insert('retailer_issues', row)
+        : await _db.update('retailer_issues', id, row);
+  }
+
+  /// Retailer se collection — 4 tarike se aa sakta hai
+  Future<void> saveRecovery({
+    int? id,
+    required int retailerId,
+    required int accountId,
+    required double amount,
+    required String method,
+    int? bankId,
+    String? utr,
+    String? receipt,
+    String? ref,
+    String? note,
+    String? date,
+  }) async {
+    final row = {
+      'retailer_id': retailerId,
+      'account_id': accountId,
+      'amount': amount,
+      'method': method,
+      'bank_id': bankId,
+      'utr': utr,
+      'receipt': receipt,
+      'ref': ref,
+      'note': note,
+      'date': date ?? todayStr(),
+      'time': nowTime(),
+    };
+    id == null
+        ? await _db.insert('retailer_recoveries', row)
+        : await _db.update('retailer_recoveries', id, row);
+  }
+
+  /// Aaj kitna diya / kitna aaya
+  Future<double> todayIssued() => _db.sum(
+      'SELECT COALESCE(SUM(amount),0) FROM retailer_issues WHERE date=?',
+      [todayStr()]);
+
+  Future<double> todayRecovered() => _db.sum(
+      'SELECT COALESCE(SUM(amount),0) FROM retailer_recoveries WHERE date=?',
+      [todayStr()]);
+
+  /// Jin retailers par limit se zyada udhaar hai
+  Future<List<Map<String, Object?>>> overLimitRetailers() async {
+    final list = await retailers();
+    final out = <Map<String, Object?>>[];
+    for (final r in list) {
+      final due = await retailerDue(r['id'] as int);
+      if (due > (r['credit_limit'] as num).toDouble()) {
+        out.add({...r, 'due': due});
+      }
+    }
+    return out;
   }
 
   Future<double> totalDue() async {

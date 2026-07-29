@@ -463,16 +463,29 @@ class CashTab extends StatefulWidget {
 }
 
 class _CashTabState extends State<CashTab> {
+  /// Ek direction ki saari services ka total volume.
+  /// cashin  = customer se cash liya (counter cash badhta hai)
+  /// cashout = customer ko cash diya (counter cash ghatta hai)
+  Future<double> _svcSum(String direction, String date) async {
+    final svcs = await Repo.i.services();
+    var t = 0.0;
+    for (final s in svcs) {
+      if (s['direction'] != direction) continue;
+      final x = await Repo.i.serviceTotals('${s['code']}', date);
+      t += x['vol'] ?? 0;
+    }
+    return t;
+  }
+
   Future<Map<String, dynamic>> _load() async {
     final d = todayStr();
     return {
       'cash': await Repo.i.counterCash(),
       'floats': await Repo.i.floats(date: d),
       'cms': await Repo.i.cmsVolume(d),
-      'aeps': await Repo.i.serviceTotals('aeps', d),
-      'upi': await Repo.i.serviceTotals('upi', d),
-      'tr': await Repo.i.serviceTotals('upitransfer', d),
-      'rc': await Repo.i.serviceTotals('recharge', d),
+      // Services database se — direction ke hisaab se cash in/out
+      'svcIn': await _svcSum('cashin', d),
+      'svcOut': await _svcSum('cashout', d),
       'deposits': await Repo.i.deposits(date: d),
       'banks': await Repo.i.banks(),
     };
@@ -498,8 +511,8 @@ class _CashTabState extends State<CashTab> {
         final flTotal = floats.fold(0.0, (s, e) => s + numOf(e['amount']));
         final depTotal = deps.fold(0.0, (s, e) => s + numOf(e['amount']));
         final chgTotal = deps.fold(0.0, (s, e) => s + numOf(e['charge']));
-        final out = (d['aeps'] as Map)['vol']! + (d['upi'] as Map)['vol']!;
-        final inSvc = (d['tr'] as Map)['vol']! + (d['rc'] as Map)['vol']!;
+        final out = numOf(d['svcOut']);
+        final inSvc = numOf(d['svcIn']);
 
         return ListView(padding: const EdgeInsets.all(14), children: [
           Container(

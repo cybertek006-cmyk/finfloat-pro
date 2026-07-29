@@ -3,6 +3,7 @@ import '../core/ui.dart';
 import '../data/repo.dart';
 import '../logic/calc.dart';
 import 'forms.dart';
+import 'retailers.dart';
 import 'day_dialog.dart';
 
 class DashboardTab extends StatefulWidget {
@@ -15,6 +16,17 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   final _r = Repo.i;
 
+  /// Har service ka aaj ka total — services database se aati hain
+  /// isliye user jitni bhi banaye, sab apne aap dikhengi.
+  Future<Map<String, Map<String, double>>> _svcTotals(String d) async {
+    final svcs = await _r.services();
+    final out = <String, Map<String, double>>{};
+    for (final s in svcs) {
+      out['${s['code']}'] = await _r.serviceTotals('${s['code']}', d);
+    }
+    return out;
+  }
+
   Future<Map<String, dynamic>> _load() async {
     final d = todayStr();
     return {
@@ -26,13 +38,14 @@ class _DashboardTabState extends State<DashboardTab> {
       'services': await _r.services(),
       'cmsVol': await _r.cmsVolume(d),
       'depTotal': await _r.depositTotal(d),
-      'aeps': await _r.serviceTotals('aeps', d),
-      'upi': await _r.serviceTotals('upi', d),
-      'transfer': await _r.serviceTotals('upitransfer', d),
-      'recharge': await _r.serviceTotals('recharge', d),
+      'svcTotals': await _svcTotals(d),
       'pending': await _r.pendingPayouts(),
       'hasOpen': await _r.hasSnap('open'),
       'hasClose': await _r.hasSnap('close'),
+      'retailerDue': await _r.totalDue(),
+      'todayIssued': await _r.todayIssued(),
+      'todayRecovered': await _r.todayRecovered(),
+      'overLimit': await _r.overLimitRetailers(),
     };
   }
 
@@ -54,6 +67,8 @@ class _DashboardTabState extends State<DashboardTab> {
         final pr = d['profit'] as DayProfit;
         final accounts = (d['accounts'] as List).cast<Map<String, Object?>>();
         final pending = (d['pending'] as List).cast<Map<String, Object?>>();
+        final services = (d['services'] as List).cast<Map<String, Object?>>();
+        final totals = d['svcTotals'] as Map<String, Map<String, double>>;
 
         return RefreshIndicator(
           onRefresh: () async => _refresh(),
@@ -187,9 +202,13 @@ class _DashboardTabState extends State<DashboardTab> {
                 childAspectRatio: 1.75,
                 children: [
                   StatCard('💵', C.accent, sm(d['cmsVol']), 'CMS'),
-                  StatCard('👆', C.teal, sm((d['aeps'] as Map)['vol']), 'AEPS'),
-                  StatCard('📱', C.primaryLight, sm((d['upi'] as Map)['vol']), 'UPI Cashout'),
-                  StatCard('➡️', C.purple, sm((d['transfer'] as Map)['vol']), 'UPI Transfer'),
+                  // Har service ka apna card -- database se aate hain,
+                  // isliye user jitni bhi service banaye sab dikhengi
+                  ...services.map((sv) {
+                    final t = totals['${sv['code']}'] ?? const <String, double>{};
+                    return StatCard('${sv['icon']}', C.hex('${sv['color']}'),
+                        sm(t['vol']), '${sv['name']}');
+                  }),
                   StatCard('🏦', C.primary, sm(d['depTotal']), 'Deposit'),
                   StatCard('⚠️', C.error, sm(pr.depositCharges), 'Bank Charges'),
                 ],
@@ -201,18 +220,66 @@ class _DashboardTabState extends State<DashboardTab> {
                 height: 84,
                 child: ListView(scrollDirection: Axis.horizontal, children: [
                   _q('💵', 'CMS', C.accent, () => _open(const CmsForm())),
-                  _q('👆', 'AEPS', C.teal, () => _open(const ShopForm(code: 'aeps'))),
-                  _q('📱', 'UPI Out', C.primaryLight,
-                      () => _open(const ShopForm(code: 'upi'))),
-                  _q('➡️', 'Transfer', C.purple,
-                      () => _open(const ShopForm(code: 'upitransfer'))),
-                  _q('📞', 'Recharge', C.pink,
-                      () => _open(const ShopForm(code: 'recharge'))),
+                  // Har service ka button -- dynamic
+                  ...services.map((sv) => _q(
+                        '${sv['icon']}',
+                        '${sv['name']}'.split(' ').first,
+                        C.hex('${sv['color']}'),
+                        () => _open(ShopForm(code: '${sv['code']}')),
+                      )),
                   _q('🏦', 'Deposit', C.primary, () => _open(const DepositForm())),
                   _q('✋', 'Payout', C.pink, () => _open(const PayoutForm())),
                   _q('💰', 'Float', C.warning, () => _open(const FloatForm())),
+                  _q('📤', 'Retailer\nFund', C.purple, () => _open(const IssueForm())),
+                  _q('📥', 'Collection', C.accent,
+                      () => _open(const RecoveryForm())),
                 ]),
               ),
+
+              // Retailer outstanding
+              Sec('Retailer Outstanding', trailing: TextButton(
+                onPressed: () async {
+                  await Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const RetailersScreen()));
+                  _refresh();
+                },
+                child: const Text('Sab dekhein', style: TextStyle(fontSize: 11.5)),
+              )),
+              AppCard(
+                padding: const EdgeInsets.all(13),
+                child: Column(children: [
+                  Row2('📤 Aaj diya', money(d['todayIssued']), color: C.purple),
+                  Row2('📥 Aaj aaya', money(d['todayRecovered']), color: C.accent),
+                  const Divider(height: 14),
+                  Row2('Total baaki', money(d['retailerDue']),
+                      bold: true,
+                      color: numOf(d['retailerDue']) > 0 ? C.error : C.accent),
+                ]),
+              ),
+              if ((d['overLimit'] as List).isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...(d['overLimit'] as List).cast<Map<String, Object?>>().map(
+                      (r) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFFDF0F0),
+                            border: Border.all(color: const Color(0xFFF0C0C0)),
+                            borderRadius: BorderRadius.circular(9)),
+                        child: Row(children: [
+                          const Text('⚠️', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              '${r['name']} — ${money(numOf(r['due']))} '
+                              '(limit ${money(numOf(r['credit_limit']))})',
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+              ],
 
               // Wallets
               const Sec('Company ID Wallets'),

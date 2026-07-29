@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../core/ui.dart';
 import '../data/repo.dart';
 import '../logic/calc.dart';
+import 'retailers.dart';
 
 class ReportsTab extends StatefulWidget {
   const ReportsTab({super.key});
@@ -32,6 +33,9 @@ class _ReportsTabState extends State<ReportsTab> {
     ['cash', 'Cash'],
     ['wallet', 'Wallet'],
     ['dayclose', 'Day Close'],
+    ['retailer', 'Retailer Due'],
+    ['rissue', 'Fund Given'],
+    ['rrecovery', 'Collection'],
   ];
 
   String? get _date => _allTime ? null : todayStr();
@@ -43,10 +47,10 @@ class _ReportsTabState extends State<ReportsTab> {
       case 'profit':
         final pr = await r.dayProfit(d);
         final rows = <List<String>>[];
-        for (final code in ['aeps', 'upi', 'upitransfer', 'recharge']) {
-          final t = await r.serviceTotals(code, d);
-          final s = (await r.services()).where((x) => x['code'] == code).firstOrNull;
-          rows.add(['${s?['name'] ?? code}', 'Auto', sm(t['vol']), money(t['net'])]);
+        // Saari services database se — user jo bhi banaye
+        for (final sv in await r.services()) {
+          final t = await r.serviceTotals('${sv['code']}', d);
+          rows.add(['${sv['name']}', 'Auto', sm(t['vol']), money(t['net'])]);
         }
         rows.insert(0, ['CMS', 'Auto', sm(await r.cmsVolume(d)), money(pr.cmsNet)]);
         rows.add(['Distributor', 'Auto', '—', money(pr.distProfit)]);
@@ -162,17 +166,22 @@ class _ReportsTabState extends State<ReportsTab> {
       case 'cash':
         final fl = await r.floats(date: d);
         final dep = await r.deposits(date: d);
-        final aeps = await r.serviceTotals('aeps', d);
-        final upi = await r.serviceTotals('upi', d);
-        final tr = await r.serviceTotals('upitransfer', d);
-        final rc = await r.serviceTotals('recharge', d);
+        // Services direction ke hisaab se in/out
+        final svcRows = <List<String>>[];
+        for (final sv in await r.services()) {
+          final t = await r.serviceTotals('${sv['code']}', d);
+          if ((t['vol'] ?? 0) == 0) continue;
+          final isIn = sv['direction'] == 'cashin';
+          svcRows.add([
+            '${sv['name']}',
+            isIn ? money(t['vol']) : '—',
+            isIn ? '—' : money(t['vol']),
+          ]);
+        }
         return _Rep('Cash Flow Report', ['Type', 'In', 'Out'], [
           ['Cash float', money(sumOf(fl, 'amount')), '—'],
           ['CMS collection', money(await r.cmsVolume(d)), '—'],
-          ['UPI Transfer', money(tr['vol']), '—'],
-          ['Recharge', money(rc['vol']), '—'],
-          ['AEPS cashout', '—', money(aeps['vol'])],
-          ['UPI cashout', '—', money(upi['vol'])],
+          ...svcRows,
           ['Bank deposit', '—', money(sumOf(dep, 'amount'))],
         ], {
           'Counter Cash in Hand': money(await r.counterCash()),
@@ -191,6 +200,76 @@ class _ReportsTabState extends State<ReportsTab> {
           'Total Wallet': money(await r.totalWallet()),
           'Company IDs': '${accs.length}',
         });
+
+      case 'retailer':
+        final list = await r.retailers();
+        final rows = <List<String>>[];
+        var totIssued = 0.0, totRecovered = 0.0, totDue = 0.0, overCount = 0;
+        for (final x in list) {
+          final id = x['id'] as int;
+          final iss = await r.retailerIssued(id);
+          final rec = await r.retailerRecovered(id);
+          final due = await r.retailerDue(id);
+          final lim = numOf(x['credit_limit']);
+          if (due > lim) overCount++;
+          totIssued += iss;
+          totRecovered += rec;
+          totDue += due;
+          rows.add([
+            '${x['name']}', '${x['area'] ?? ''}',
+            sm(iss), sm(rec), sm(due), sm(lim),
+            due > lim ? 'OVER' : 'OK',
+          ]);
+        }
+        return _Rep(
+          'Retailer Outstanding',
+          ['Retailer', 'Area', 'Diya', 'Aaya', 'Baaki', 'Limit', 'Status'],
+          rows,
+          {
+            'Retailers': '${list.length}',
+            'Total diya': money(totIssued),
+            'Total aaya': money(totRecovered),
+            'TOTAL OUTSTANDING': money(totDue),
+            'Limit cross': '$overCount',
+          },
+        );
+
+      case 'rissue':
+        final e = await r.retailerIssues(date: d);
+        return _Rep(
+          'Retailer Fund Given',
+          ['Date', 'Retailer', 'Company', 'Reference', 'Amount'],
+          e.map((x) => [
+                dmy('${x['date']}'), '${x['retailer']}', '${x['company']}',
+                '${x['ref'] ?? '—'}', money(numOf(x['amount'])),
+              ]).toList(),
+          {
+            'Entries': '${e.length}',
+            'Total given': money(sumOf(e, 'amount')),
+          },
+        );
+
+      case 'rrecovery':
+        final e = await r.retailerRecoveries(date: d);
+        final byM = await r.recoveryByMethod();
+        final sum = <String, String>{};
+        byM.forEach((k, v) {
+          final m = RMethod.of(k);
+          sum[m.name] = money(v);
+        });
+        sum['TOTAL COLLECTED'] = money(sumOf(e, 'amount'));
+        return _Rep(
+          'Retailer Collection',
+          ['Date', 'Retailer', 'Method', 'Kahan gaya', 'Amount'],
+          e.map((x) {
+            final m = RMethod.of('${x['method']}');
+            return [
+              dmy('${x['date']}'), '${x['retailer']}',
+              m.name, m.tag, money(numOf(x['amount'])),
+            ];
+          }).toList(),
+          sum,
+        );
 
       case 'dayclose':
         final s = await r.snaps();
