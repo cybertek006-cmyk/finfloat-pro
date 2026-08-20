@@ -1,0 +1,14 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    unused_import: warning
+    deprecated_member_use: ignore
+  exclude:
+    - "**/*.g.dart"
+
+linter:
+  rules:
+    - prefer_const_constructors
+    - use_super_parameters
+    - avoid_print

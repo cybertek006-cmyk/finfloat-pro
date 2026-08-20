@@ -1,0 +1,57 @@
+name: finfloat
+description: FinFloat Pro - Offline Fintech Float Management System by Digitronic Services.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Local database (offline)
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.5
+
+  # Local settings + secure PIN storage
+  shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.6
+
+  # UI
+  intl: ^0.19.0
+
+  # Hindi welcome voice — phone ki apni awaaz, offline, free
+  #
+  # VERSION PIN ZAROORI HAI (^ nahi lagana):
+  # flutter_tts 4.2.5+ Kotlin 2.2.20 maangta hai, par Flutter 3.27 ka
+  # Android template Kotlin 1.8.22 deta hai -> build fail
+  # ("incompatible version of Kotlin ... metadata 2.2.0, expected 1.8.0").
+  # 4.2.0 Kotlin 1.9.10 par hai, jo hamare setup mein theek chalta hai.
+  flutter_tts: 4.2.0
+
+  # Backup: zip + share sheet (Google Drive ke liye)
+  archive: ^3.6.1
+  share_plus: ^10.1.2
+  file_picker: ^8.1.6
+
+  # Reports
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # Attachments
+  image_picker: ^1.1.2
+  open_filex: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  # Sirf testing ke liye — desktop par SQLite chalane ko.
+  # APK mein ye nahi jaata (dev_dependency hai).
+  sqflite_common_ffi: ^2.3.3
+
+flutter:
+  uses-material-design: true

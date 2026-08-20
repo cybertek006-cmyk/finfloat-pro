@@ -1,0 +1,387 @@
+import 'package:flutter/material.dart';
+import '../core/ui.dart';
+import '../logic/hindi.dart';
+import '../data/repo.dart';
+import '../logic/calc.dart';
+import 'dayend.dart';
+import 'forms.dart';
+import 'retailers.dart';
+import 'day_dialog.dart';
+
+class DashboardTab extends StatefulWidget {
+  final VoidCallback onChanged;
+  const DashboardTab({super.key, required this.onChanged});
+  @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  final _r = Repo.i;
+
+  /// Har service ka aaj ka total — services database se aati hain
+  /// isliye user jitni bhi banaye, sab apne aap dikhengi.
+  Future<Map<String, Map<String, double>>> _svcTotals(String d) async {
+    final svcs = await _r.services();
+    final out = <String, Map<String, double>>{};
+    for (final s in svcs) {
+      out['${s['code']}'] = await _r.serviceTotals('${s['code']}', d);
+    }
+    return out;
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final d = todayStr();
+    return {
+      'profit': await _r.dayProfit(d),
+      'wallet': await _r.totalWallet(),
+      'myCash': await _r.myCash(),
+      'cash': await _r.counterCash(),
+      'totalCash': await _r.totalCash(),
+      'tds': await _r.totalTds(d),
+      'accounts': await _r.accounts(),
+      'services': await _r.services(),
+      'cmsVol': await _r.cmsVolume(d),
+      'depTotal': await _r.depositTotal(d),
+      'svcTotals': await _svcTotals(d),
+      'pending': await _r.pendingPayouts(),
+      'hasOpen': await _r.hasSnap('open'),
+      'hasClose': await _r.hasSnap('close'),
+      'retailerDue': await _r.totalDue(),
+      'todayIssued': await _r.todayIssued(),
+      'todayRecovered': await _r.todayRecovered(),
+      'overLimit': await _r.overLimitRetailers(),
+    };
+  }
+
+  void _refresh() {
+    setState(() {});
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _load(),
+      builder: (c, snap) {
+        if (snap.hasError) return ErrBox(snap.error!);
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final d = snap.data!;
+        final pr = d['profit'] as DayProfit;
+        final accounts = (d['accounts'] as List).cast<Map<String, Object?>>();
+        final pending = (d['pending'] as List).cast<Map<String, Object?>>();
+        final services = (d['services'] as List).cast<Map<String, Object?>>();
+        final totals = d['svcTotals'] as Map<String, Map<String, double>>;
+
+        return RefreshIndicator(
+          onRefresh: () async => _refresh(),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+            children: [
+              // Day start / close
+              Row(children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: d['hasOpen'] == true ? C.muted : C.warning,
+                        minimumSize: const Size.fromHeight(42)),
+                    onPressed: () async {
+                      await showDayDialog(context, 'open');
+                      _refresh();
+                    },
+                    icon: const Text('☀️', style: TextStyle(fontSize: 14)),
+                    label: Text(d['hasOpen'] == true ? 'Day Started' : 'Day Start',
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: d['hasClose'] == true ? C.muted : C.primary,
+                        minimumSize: const Size.fromHeight(42)),
+                    onPressed: () async {
+                      await showDayDialog(context, 'close');
+                      _refresh();
+                    },
+                    icon: const Text('🌙', style: TextStyle(fontSize: 14)),
+                    label: Text(d['hasClose'] == true ? 'Day Closed' : 'Day Close',
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 12),
+
+              // Net profit banner
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [C.primary, C.primaryLight],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Text('Aaj ka NET PROFIT',
+                        style: TextStyle(color: Colors.white70, fontSize: 11.5)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: C.fade(Colors.white, .18),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: const Text('⚡ OFFLINE',
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(money(pr.net),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
+                  ),
+                  // Hindi mein bhi — bade number par feel aati hai
+                  if (pr.net.abs() >= 1000)
+                    Text(hindiRupees(pr.net, paise: false),
+                        style: TextStyle(
+                            color: C.fade(Colors.white, .72),
+                            fontSize: 10.5,
+                            height: 1.3)),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    _b('Wallet', sm(d['wallet'])),
+                    _b('Cash', sm(d['totalCash'])),
+                    _b('TDS', sm(d['tds'])),
+                  ]),
+                ]),
+              ),
+
+              // Profit breakup
+              const Sec('Profit Breakup'),
+              AppCard(
+                child: Padding(
+                  padding: const EdgeInsets.all(13),
+                  child: Column(children: [
+                    _pr('💵 CMS', pr.cmsNet, true),
+                    _pr('🏪 Shop services', pr.shopNet, true),
+                    _pr('🤖 Distributor', pr.distProfit, true),
+                    _pr('✋ Manual payouts', pr.manualNet, false),
+                    const Divider(height: 14),
+                    Row2('Gross income', money(pr.gross), bold: true),
+                    Row2('− Bank deposit charges', '−${money(pr.depositCharges)}',
+                        color: C.error),
+                    const Divider(height: 14),
+                    Row2('NET PROFIT', money(pr.net), bold: true, color: C.accent),
+                  ]),
+                ),
+              ),
+
+              if (pending.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8EC),
+                      border: Border.all(color: const Color(0xFFF5D9A8)),
+                      borderRadius: BorderRadius.circular(9)),
+                  child: Row(children: [
+                    const Text('⚠️', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        'Payout baaki: ${pending.map((e) => e['name']).join(', ')}',
+                        style: const TextStyle(fontSize: 11.5),
+                      ),
+                    ),
+                  ]),
+                ),
+
+              // Volume
+              const Sec("Aaj ka Volume"),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.75,
+                children: [
+                  StatCard('💵', C.accent, sm(d['cmsVol']), 'CMS'),
+                  // Har service ka apna card -- database se aate hain,
+                  // isliye user jitni bhi service banaye sab dikhengi
+                  ...services.map((sv) {
+                    final t = totals['${sv['code']}'] ?? const <String, double>{};
+                    return StatCard('${sv['icon']}', C.hex('${sv['color']}'),
+                        sm(t['vol']), '${sv['name']}');
+                  }),
+                  StatCard('🏦', C.primary, sm(d['depTotal']), 'Deposit'),
+                  StatCard('⚠️', C.error, sm(pr.depositCharges), 'Bank Charges'),
+                ],
+              ),
+
+              // Quick add
+              const Sec('Quick Add'),
+              SizedBox(
+                height: 84,
+                child: ListView(scrollDirection: Axis.horizontal, children: [
+                  _q('💵', 'CMS', C.accent, () => _open(const CmsForm())),
+                  // Har service ka button -- dynamic
+                  ...services.map((sv) => _q(
+                        '${sv['icon']}',
+                        '${sv['name']}'.split(' ').first,
+                        C.hex('${sv['color']}'),
+                        () => _open(ShopForm(code: '${sv['code']}')),
+                      )),
+                  _q('🏦', 'Deposit', C.primary, () => _open(const DepositForm())),
+                  _q('✋', 'Payout', C.pink, () => _open(const PayoutForm())),
+                  _q('📋', 'Day-End\nSummary', C.primary,
+                      () => _open(const DayEndForm())),
+                  _q('🔄', 'Cash\nTransfer', C.warning,
+                      () => _open(const TransferForm())),
+                  _q('📤', 'Retailer\nFund', C.purple, () => _open(const IssueForm())),
+                  _q('📥', 'Collection', C.accent,
+                      () => _open(const RecoveryForm())),
+                ]),
+              ),
+
+              // Retailer outstanding
+              Sec('Retailer Outstanding', trailing: TextButton(
+                onPressed: () async {
+                  await Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const RetailersScreen()));
+                  _refresh();
+                },
+                child: const Text('Sab dekhein', style: TextStyle(fontSize: 11.5)),
+              )),
+              AppCard(
+                padding: const EdgeInsets.all(13),
+                child: Column(children: [
+                  Row2('📤 Aaj diya', money(d['todayIssued']), color: C.purple),
+                  Row2('📥 Aaj aaya', money(d['todayRecovered']), color: C.accent),
+                  const Divider(height: 14),
+                  Row2('Total baaki', money(d['retailerDue']),
+                      bold: true,
+                      color: numOf(d['retailerDue']) > 0 ? C.error : C.accent),
+                ]),
+              ),
+              if ((d['overLimit'] as List).isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...(d['overLimit'] as List).cast<Map<String, Object?>>().map(
+                      (r) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFFDF0F0),
+                            border: Border.all(color: const Color(0xFFF0C0C0)),
+                            borderRadius: BorderRadius.circular(9)),
+                        child: Row(children: [
+                          const Text('⚠️', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              '${r['name']} — ${money(numOf(r['due']))} '
+                              '(limit ${money(numOf(r['credit_limit']))})',
+                              style: const TextStyle(fontSize: 11.5),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+              ],
+
+              // Wallets
+              const Sec('Company ID Wallets'),
+              if (accounts.isEmpty)
+                const Empty('🏢', 'Koi company ID nahi',
+                    sub: 'More → Companies se add karein')
+              else
+                ...accounts.map((a) => FutureBuilder<double>(
+                      future: _r.wallet(a['id'] as int),
+                      builder: (c, w) {
+                        final bal = w.data ?? 0;
+                        final isDist = a['type'] == 'distributor';
+                        final auto = a['company_mode'] == 'auto';
+                        final low = numOf(a['low_limit']);
+                        return Tile(
+                          icon: isDist ? '🤖' : '🏪',
+                          color: isDist ? C.purple : C.accent,
+                          edge: isDist
+                              ? C.purple
+                              : (bal < low ? C.warning : C.accent),
+                          title: '${a['label']}',
+                          sub: '${a['company']} · ${a['id_no']}\n'
+                              '${a['fundable'] == 1 ? 'Fund deposit hota hai' : 'Fund nahi — sirf profit'}',
+                          amount: money(bal),
+                          amountSub: auto ? 'AUTO' : 'MANUAL',
+                          amountColor: bal < low && !isDist ? C.warning : C.text,
+                        );
+                      },
+                    )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _b(String k, String v) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(v,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+      );
+
+  Widget _pr(String label, double v, bool auto) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.5),
+        child: Row(children: [
+          Expanded(
+            child: Row(children: [
+              Flexible(child: Text(label, style: const TextStyle(fontSize: 12.5))),
+              const SizedBox(width: 5),
+              Badge2(auto ? 'AUTO' : 'MANUAL', auto ? C.accent : C.pink),
+            ]),
+          ),
+          Text(money(v), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+        ]),
+      );
+
+  Widget _q(String icon, String label, Color color, VoidCallback tap) => Padding(
+        padding: const EdgeInsets.only(right: 9),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: tap,
+          child: Container(
+            width: 76,
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: C.fade(color, .5))),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(icon, style: const TextStyle(fontSize: 19)),
+              const SizedBox(height: 5),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ),
+      );
+
+  Future<void> _open(Widget form) async {
+    final ok = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => form, fullscreenDialog: true));
+    if (ok == true) _refresh();
+  }
+}
